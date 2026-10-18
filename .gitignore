@@ -269,3 +269,7 @@ case_studies/ch20_*/
 # transition plugin: machine paths, private-tracker issue numbers and quoted instructions,
 # none of it reader-facing. Two landed in #580 before this rule existed.
 .workspace/
+
+# local git worktrees
+.worktrees/
+
