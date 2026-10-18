@@ -1,0 +1,103 @@
+from __future__ import annotations
+
+import importlib.util
+from pathlib import Path
+
+import pytest
+
+REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def _load_lib():
+    path = REPO_ROOT / "docs" / "operator" / "etf_calibration_lib.py"
+    spec = importlib.util.spec_from_file_location("etf_calibration_lib", path)
+    mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def test_require_etf_registry_missing(tmp_path: Path) -> None:
+    lib = _load_lib()
+    with pytest.raises(FileNotFoundError) as ei:
+        lib.require_etf_registry(tmp_path)
+    assert lib.DOWNLOAD_HINT in str(ei.value)
+
+
+def test_require_etf_registry_present(tmp_path: Path) -> None:
+    lib = _load_lib()
+    db = tmp_path / "case_studies" / "etfs" / "run_log" / "registry.db"
+    db.parent.mkdir(parents=True)
+    db.write_bytes(b"sqlite")
+    assert lib.require_etf_registry(tmp_path) == db
+
+
+def test_repo_root_from_here_raises_off_repo(tmp_path: Path) -> None:
+    lib = _load_lib()
+    with pytest.raises(FileNotFoundError):
+        lib.repo_root_from_here(tmp_path)
+
+
+def test_does_not_establish_bullets_locked() -> None:
+    lib = _load_lib()
+    bullets = lib.does_not_establish_bullets()
+    assert any("MT5" in b for b in bullets)
+    assert any("what-this-is.md" in b for b in bullets)
+    assert any("unbiased alpha" in b for b in bullets)
+
+
+def test_format_readout_has_six_section_headers() -> None:
+    lib = _load_lib()
+    text = lib.format_readout(
+        {
+            "registry_path": "/tmp/registry.db",
+            "artifact_note": "present",
+            "family": "gbm",
+            "config_name": "demo",
+            "label": "fwd_ret_21d",
+            "val_backtest_hash": "abc",
+            "val_prediction_hash": "def",
+            "does_not_establish": ["x"],
+        }
+    )
+    for header in (
+        "1. Bundle present",
+        "2. Selected configuration",
+        "3. IC vs traded Sharpe",
+        "4. Cost survival",
+        "5. Sealed holdout",
+        "6. Does not establish",
+    ):
+        assert header in text
+
+
+def test_build_readout_uses_carrier_seam(monkeypatch, tmp_path: Path) -> None:
+    lib = _load_lib()
+    db = tmp_path / "case_studies" / "etfs" / "run_log" / "registry.db"
+    db.parent.mkdir(parents=True)
+    db.write_bytes(b"\x00")
+
+    fake = {
+        "val_backtest_hash": "bh",
+        "val_prediction_hash": "ph",
+        "val_stage": "signal",
+        "val_sharpe": 0.4,
+        "family": "linear",
+        "config_name": "ridge",
+        "label": "fwd_ret_21d",
+        "holdout_backtest_hash": None,
+        "holdout_sharpe": None,
+        "spec_json": "{}",
+    }
+    monkeypatch.setattr(lib, "resolve_carrier", lambda root, cs: fake)
+    monkeypatch.setattr(lib, "_prediction_ic", lambda dbp, ph: (0.01, -0.01, 0.02))
+    monkeypatch.setattr(lib, "_ic_leader_row", lambda root, cs: ("gbm", 0.03, 0.1))
+    monkeypatch.setattr(
+        lib, "_cost_sensitivity_note", lambda dbp, ph: "cost grid: 3 levels, sharpe 0.2-0.5"
+    )
+
+    out = lib.build_readout(tmp_path, case_study="etfs")
+    assert out["family"] == "linear"
+    assert out["ic_leader_family"] == "gbm"
+    assert out["holdout_note"]
+    assert out["does_not_establish"] == lib.does_not_establish_bullets()
