@@ -44,7 +44,7 @@ After stage **20** (or with a downloaded bundle that already includes its output
 uv run python docs/operator/etf_calibration.py
 ```
 
-Use the paired `etf_calibration.ipynb` if you prefer the notebook UI. Both are read-only registry readouts (implemented alongside this guide).
+You can also open `etf_calibration.ipynb` after Task 3’s Jupytext sync if you prefer the notebook UI. Both readout files are read-only registry readouts (Wave B; not required for this guide slice).
 
 ## Continue only if
 
