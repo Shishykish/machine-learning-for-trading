@@ -36,6 +36,8 @@ def _build_bundle(
     valid_manifest: bool = True,
     wal: bool = False,
     ship_wal: bool = False,
+    dangling_fk: bool = False,
+    accepted_fk: int | None = None,
 ) -> Path:
     """Build one bundle. `wal` writes the registry the way the case studies do."""
     run_log = tmp_path / "payload/case_studies/etfs/run_log"
@@ -48,6 +50,12 @@ def _build_bundle(
         connection.execute("PRAGMA journal_mode=WAL")
     connection.execute("CREATE TABLE release_probe (value TEXT NOT NULL)")
     connection.execute("INSERT INTO release_probe VALUES ('accepted')")
+    if dangling_fk:
+        connection.execute("CREATE TABLE parent (id INTEGER PRIMARY KEY)")
+        connection.execute(
+            "CREATE TABLE child (id INTEGER PRIMARY KEY, parent_id INTEGER REFERENCES parent(id))"
+        )
+        connection.execute("INSERT INTO child VALUES (1, 999)")
     connection.commit()
     if not ship_wal:
         # Closing checkpoints the log and removes the sidecars, which is what a bundle must
@@ -64,6 +72,12 @@ def _build_bundle(
         f"{registry_hash}  ./registry.db\n"
         f"{prediction_hash}  ./predictions/abc/predictions.parquet\n"
     )
+    if accepted_fk is not None:
+        (release_dir / "accepted_registry.tsv").write_text(
+            "case_study\tsource_path\tsha256\tintegrity\tforeign_keys\t"
+            "training_runs\tprediction_sets\tbacktest_runs\n"
+            f"etfs\t/tmp\t{registry_hash}\tok\t{accepted_fk}\t0\t0\t0\n"
+        )
 
     archive = tmp_path / "etfs.tar.gz"
     with tarfile.open(archive, "w:gz") as tar:
@@ -166,6 +180,45 @@ def test_a_bundle_shipping_an_uncheckpointed_log_is_refused(tmp_path: Path) -> N
         )
 
     assert (existing / "sentinel").read_text() == "keep"
+
+
+def test_bundle_with_documented_fk_count_installs(tmp_path: Path) -> None:
+    archive = _build_bundle(tmp_path, dangling_fk=True, accepted_fk=1)
+    repo = tmp_path / "repo"
+    install = download_artifacts.install_artifact_archive(
+        archive,
+        "etfs",
+        expected_sha256=_sha256(archive),
+        repo_root=repo,
+        force=True,
+    )
+    assert (install / "registry.db").is_file()
+
+
+def test_bundle_with_fk_but_no_accepted_tsv_is_refused(tmp_path: Path) -> None:
+    archive = _build_bundle(tmp_path, dangling_fk=True, accepted_fk=None)
+    repo = tmp_path / "repo"
+    with pytest.raises(ValueError, match="Foreign key"):
+        download_artifacts.install_artifact_archive(
+            archive,
+            "etfs",
+            expected_sha256=_sha256(archive),
+            repo_root=repo,
+            force=True,
+        )
+
+
+def test_bundle_with_wrong_accepted_fk_count_is_refused(tmp_path: Path) -> None:
+    archive = _build_bundle(tmp_path, dangling_fk=True, accepted_fk=99)
+    repo = tmp_path / "repo"
+    with pytest.raises(ValueError, match="foreign.key|accepted"):
+        download_artifacts.install_artifact_archive(
+            archive,
+            "etfs",
+            expected_sha256=_sha256(archive),
+            repo_root=repo,
+            force=True,
+        )
 
 
 def _split(path: Path, size: int) -> list[Path]:
