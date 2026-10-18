@@ -101,3 +101,25 @@ def test_build_readout_uses_carrier_seam(monkeypatch, tmp_path: Path) -> None:
     assert out["ic_leader_family"] == "gbm"
     assert out["holdout_note"]
     assert out["does_not_establish"] == lib.does_not_establish_bullets()
+
+
+def test_notebook_source_calls_lib() -> None:
+    src = (REPO_ROOT / "docs" / "operator" / "etf_calibration.py").read_text(encoding="utf-8")
+    assert "require_etf_registry" in src
+    assert "build_readout" in src
+    assert "format_readout" in src
+    assert "run_log" in src  # read-only prose
+
+
+def test_guide_relative_targets_exist() -> None:
+    import re
+
+    guide = (REPO_ROOT / "docs" / "operator" / "etf-calibration.md").read_text(encoding="utf-8")
+    rels = re.findall(r"\]\(([^)#]+?)(?:#[^)]*)?\)", guide)
+    assert rels, "guide has no markdown links"
+    base = REPO_ROOT / "docs" / "operator"
+    for rel in rels:
+        if rel.startswith("http"):
+            continue
+        target = (base / rel).resolve()
+        assert target.exists(), f"broken link: {rel} -> {target}"
