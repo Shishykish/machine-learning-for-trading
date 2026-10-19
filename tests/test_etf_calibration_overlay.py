@@ -152,9 +152,25 @@ def test_guide_relative_targets_exist() -> None:
 @pytest.mark.production_extract
 def test_build_readout_against_published_registry() -> None:
     lib = _load_lib()
-    reg = REPO_ROOT / "case_studies" / "etfs" / "run_log" / "registry.db"
+    run_log = REPO_ROOT / "case_studies" / "etfs" / "run_log"
+    reg = run_log / "registry.db"
     if not reg.is_file() or reg.stat().st_size == 0:
         pytest.skip("ETF artifact bundle not installed")
+
+    coverage = run_log / ".release" / "artifact_coverage.tsv"
+    disk_trees = (
+        len(list((run_log / "backtest").glob("*/daily_returns.parquet")))
+        if (run_log / "backtest").is_dir()
+        else 0
+    )
+    # Today's published etfs pack: dense registry, curated 21 return trees.
+    slim = coverage.is_file() and disk_trees < 100
+
+    if slim:
+        with pytest.raises(lib.SparseArtifactBundleError, match="Missing registered return artifact"):
+            lib.build_readout(REPO_ROOT)
+        return
+
     out = lib.build_readout(REPO_ROOT)
     assert out["val_backtest_hash"]
     assert "6. Does not establish" in lib.format_readout(out)

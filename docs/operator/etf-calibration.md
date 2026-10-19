@@ -13,6 +13,12 @@ uv run python scripts/download_artifacts.py --cs etfs
 
 The free-data download is **optional**—run it only for stages you actually open. **Continue only if** `case_studies/etfs/run_log/registry.db` exists after the artifact step.
 
+The published `etfs` artifact bundle may install a **full registry** with only a
+**curated subset** of `run_log/backtest/*/daily_returns.parquet` trees (see
+`run_log/.release/artifact_coverage.tsv`). The calibration readout calls
+`resolve_solvent_carrier` and will **refuse** rather than invent a carrier when
+common-support ranking needs return files the release did not ship.
+
 ## What running a stage writes
 
 The calibration readout is read-only, but the **book stages** you open are not:
