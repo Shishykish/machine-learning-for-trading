@@ -50,7 +50,7 @@ After stage **20** (or with a downloaded bundle that already includes its output
 uv run python docs/operator/etf_calibration.py
 ```
 
-You can also open `etf_calibration.ipynb` after Task 3’s Jupytext sync if you prefer the notebook UI. Both readout files are read-only registry readouts (Wave B; not required for this guide slice).
+You can also open `etf_calibration.ipynb` if you prefer the notebook UI. Both files are the readout for this pass. On the published slim `etfs` bundle the expected stop is `SparseArtifactBundleError`: a missing registered return artifact, a pointer at `run_log/.release/artifact_coverage.tsv`, and no fabricated carrier.
 
 ## Continue only if
 
@@ -59,7 +59,7 @@ Before moving to the next step, check:
 - **Free data** is present if the stage you opened needs it (otherwise download or skip that stage).
 - **Artifact bundle** is installed (`registry.db` exists) before stages **13** and **20** and before the readout.
 - Stage **20** has produced its assessment outputs (or you are using the pre-built bundle).
-- The readout prints **all six sections** below without errors.
+- On a dense bundle, the readout prints **all six sections** below without errors. On the published slim bundle, stop at `SparseArtifactBundleError` instead of treating that refusal as a broken install.
 
 ## What the readout prints (six sections)
 

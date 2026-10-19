@@ -71,6 +71,27 @@ def test_format_readout_has_six_section_headers() -> None:
         assert header in text
 
 
+def test_format_readout_unavailable_ic_leader() -> None:
+    lib = _load_lib()
+    text = lib.format_readout(
+        {
+            "registry_path": "/tmp/registry.db",
+            "artifact_note": "present",
+            "family": "gbm",
+            "config_name": "demo",
+            "label": "fwd_ret_21d",
+            "val_backtest_hash": "abc",
+            "val_prediction_hash": "def",
+            "does_not_establish": ["x"],
+            "ic_leader_family": None,
+            "ic_leader_ic": None,
+            "ic_leader_sharpe": None,
+        }
+    )
+    assert "IC leader: unavailable from published rows" in text
+    assert "IC leader family: None" not in text
+
+
 def test_build_readout_uses_carrier_seam(monkeypatch, tmp_path: Path) -> None:
     lib = _load_lib()
     db = tmp_path / "case_studies" / "etfs" / "run_log" / "registry.db"

@@ -229,14 +229,20 @@ def format_readout(readout: dict[str, Any]) -> str:
         f"   IC CI: [{readout.get('ic_ci_lo', 'not available from published rows')}, "
         f"{readout.get('ic_ci_hi', 'not available from published rows')}]"
     )
-    lines.append(
-        f"   IC leader family: {readout.get('ic_leader_family', 'not available from published rows')}"
-    )
-    lines.append(
-        f"   IC leader IC / Sharpe: "
-        f"{readout.get('ic_leader_ic', 'not available from published rows')} / "
-        f"{readout.get('ic_leader_sharpe', 'not available from published rows')}"
-    )
+    ic_leader_family = readout.get("ic_leader_family")
+    ic_leader_ic = readout.get("ic_leader_ic")
+    ic_leader_sharpe = readout.get("ic_leader_sharpe")
+    if ic_leader_family is None and ic_leader_ic is None and ic_leader_sharpe is None:
+        lines.append("   IC leader: unavailable from published rows")
+    else:
+        lines.append(
+            f"   IC leader family: {readout.get('ic_leader_family', 'not available from published rows')}"
+        )
+        lines.append(
+            f"   IC leader IC / Sharpe: "
+            f"{readout.get('ic_leader_ic', 'not available from published rows')} / "
+            f"{readout.get('ic_leader_sharpe', 'not available from published rows')}"
+        )
 
     lines.append("")
     lines.append("4. Cost survival")
