@@ -41,12 +41,35 @@ def require_etf_registry(repo_root: Path) -> Path:
     return path
 
 
+class SparseArtifactBundleError(RuntimeError):
+    """Published run_log is installed but too sparse for solvent carrier resolution."""
+
+
 def resolve_carrier(repo_root: Path, case_study: str) -> dict:
     """Resolve the canonical solvent carrier for ``case_study``."""
     ensure_repo_on_path(repo_root)
     from case_studies.utils.strategy_analysis import resolve_solvent_carrier
 
-    return resolve_solvent_carrier(case_study)
+    try:
+        return resolve_solvent_carrier(case_study)
+    except FileNotFoundError as exc:
+        msg = str(exc)
+        if "Missing registered return artifact" not in msg:
+            raise
+        coverage = (
+            repo_root
+            / "case_studies"
+            / case_study
+            / "run_log"
+            / ".release"
+            / "artifact_coverage.tsv"
+        )
+        raise SparseArtifactBundleError(
+            f"{msg}. The published {case_study} artifact bundle ships a curated "
+            f"subset of return trees (see {coverage} when present). "
+            "This overlay will not fabricate a carrier or bypass solvency; "
+            "re-run stages locally or wait for a denser upstream release."
+        ) from exc
 
 
 def does_not_establish_bullets() -> list[str]:

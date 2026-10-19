@@ -111,6 +111,30 @@ def test_notebook_source_calls_lib() -> None:
     assert "run_log" in src  # read-only prose
 
 
+def test_build_readout_refuses_missing_return_artifact(monkeypatch, tmp_path: Path) -> None:
+    lib = _load_lib()
+    reg = tmp_path / "case_studies" / "etfs" / "run_log" / "registry.db"
+    reg.parent.mkdir(parents=True)
+    reg.write_bytes(b"sqlite")
+    lib.ensure_repo_on_path(REPO_ROOT)
+    import case_studies.utils.strategy_analysis as strategy_analysis
+
+    def _missing(*_a, **_k):
+        raise FileNotFoundError(
+            "Missing registered return artifact: "
+            f"{tmp_path}/case_studies/etfs/run_log/backtest/ee588560602d/daily_returns.parquet"
+        )
+
+    monkeypatch.setattr(strategy_analysis, "resolve_solvent_carrier", _missing)
+    with pytest.raises(Exception) as caught:
+        lib.build_readout(tmp_path, case_study="etfs")
+    assert type(caught.value).__name__ == "SparseArtifactBundleError"
+    message = str(caught.value)
+    assert "artifact_coverage" in message
+    assert "fabricate" in message
+    assert "Missing registered return artifact" in message
+
+
 def test_guide_relative_targets_exist() -> None:
     import re
 
