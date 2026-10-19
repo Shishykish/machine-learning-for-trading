@@ -246,6 +246,22 @@ def _validate_archive_members(tar: tarfile.TarFile, cs_id: str) -> None:
             raise ValueError(f"Unexpected archive member: {member.name}")
 
 
+def _accepted_foreign_key_count(run_log: Path) -> int:
+    path = run_log / ".release" / "accepted_registry.tsv"
+    if not path.is_file():
+        return 0
+    lines = [ln for ln in path.read_text(encoding="utf-8").splitlines() if ln.strip()]
+    if len(lines) < 2:
+        return 0
+    header = lines[0].split("\t")
+    row = lines[1].split("\t")
+    try:
+        idx = header.index("foreign_keys")
+        return int(row[idx])
+    except (ValueError, IndexError):
+        return 0
+
+
 def _verify_run_log(run_log: Path) -> None:
     manifest = run_log / ".release/SHA256SUMS"
     if not manifest.is_file():
@@ -273,11 +289,21 @@ def _verify_run_log(run_log: Path) -> None:
     # Nothing is writing this tree - it was just extracted and checksum-verified - so the
     # integrity check reads the main file directly.
     uri = f"file:{registry.resolve()}?mode=ro&immutable=1"
-    with sqlite3.connect(uri, uri=True) as connection:
+    connection = sqlite3.connect(uri, uri=True)
+    try:
         integrity = connection.execute("PRAGMA integrity_check").fetchone()
         foreign_keys = connection.execute("PRAGMA foreign_key_check").fetchall()
-    if integrity != ("ok",) or foreign_keys:
+    finally:
+        connection.close()
+    if integrity != ("ok",):
         raise ValueError("Installed registry failed SQLite integrity checks")
+    expected_fk = _accepted_foreign_key_count(run_log)
+    actual_fk = len(foreign_keys)
+    if actual_fk != expected_fk:
+        raise ValueError(
+            f"Foreign key check failed: expected {expected_fk} accepted violation(s), "
+            f"found {actual_fk}"
+        )
 
 
 def _set_tree_writable(root: Path, *, writable: bool) -> None:
